@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)http://127.0.0.1:5500/weather_dashboard/index.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather App</title>
+  <style>
+    :root {
+      --bg-day: url('https://images.unsplash.com/photo-1501973801540-537f08ccae7b');
+      --bg-night: url('https://images.unsplash.com/photo-1502082553048-f009c37129b9');
+      --bg-clouds: url('https://images.unsplash.com/photo-1501594907352-04cda38ebc29');
+      --bg-clear: url('https://images.unsplash.com/photo-1502082553048-f009c37129b9');
+      --bg-rain: url('https://images.unsplash.com/photo-1527766833261-b09c3163a791');
+      --bg-snow: url('https://images.unsplash.com/photo-1518791841217-8f162f1e1131');
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: background-image 1s ease-in-out;
+      min-height: 100vh;
+      color: white;
+    }
+
+    .overlay {
+      background-color: rgba(0,0,0,0.5);
+      min-height: 100vh;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    input {
+      padding: 10px;
+      width: 70%;
+      border-radius: 8px;
+      border: none;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #map {
+      height: 250px;
+      margin-top: 1rem;
+      border-radius: 12px;
+    }
+
+    .forecast {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .day {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      margin: 5px;
+      border-radius: 8px;
+      width: 80px;
+      color: white;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <link rel="stylesheet" href="./Weather App_files/leaflet.css">
+</head>
+<body data-new-gr-c-s-check-loaded="14.1242.0" data-gr-ext-installed="">
+  <div class="overlay">
+    <div class="container">
+      <h1>Weather App</h1>
+      <input type="text" id="city" placeholder="Enter city name">
+      <button onclick="getWeather()">Get Weather</button>
+      <div id="result"></div>
+      <div id="forecast" class="forecast"></div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="./Weather App_files/leaflet.js.download"></script>
+  <script>
+    let map;
+
+    function updateBackground(weather) {
+      const condition = weather.toLowerCase();
+      let bg = '';
+
+      if (condition.includes('rain')) bg = 'var(--bg-rain)';
+      else if (condition.includes('cloud')) bg = 'var(--bg-clouds)';
+      else if (condition.includes('snow')) bg = 'var(--bg-snow)';
+      else if (condition.includes('clear')) bg = 'var(--bg-clear)';
+      else bg = 'var(--bg-day)';
+
+      document.body.style.backgroundImage = bg;
+    }
+
+    function initMap(lat, lon) {
+      if (!map) {
+        map = L.map('map').setView([lat, lon], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+      } else {
+        map.setView([lat, lon], 10);
+        L.marker([lat, lon]).addTo(map);
+      }
+    }
+
+    async function getWeather() {
+      const city = document.getElementById("city").value.trim();
+      const apiKey = "7628f52ad57db8cb8ec65f5e197ae3da"; // Replace with your OpenWeatherMap API key
+
+      if (!city) return;
+
+      const currentRes = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`
+      );
+      const currentData = await currentRes.json();
+
+      if (currentData.cod !== 200) {
+        document.getElementById("result").innerHTML = "City not found";
+        return;
+      }
+
+      const { name, main, weather, coord } = currentData;
+      updateBackground(weather[0].main);
+
+      document.getElementById("result").innerHTML = `
+        <h2>${name}</h2>
+        <p>${weather[0].main} - ${main.temp}°C</p>
+      `;
+
+      initMap(coord.lat, coord.lon);
+
+      const forecastRes = await fetch(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=metric`
+      );
+      const forecastData = await forecastRes.json();
+      const forecastDiv = document.getElementById("forecast");
+      forecastDiv.innerHTML = "";
+
+      const days = forecastData.list.filter((_, i) => i % 8 === 0);
+      days.forEach((item) => {
+        const date = new Date(item.dt_txt).toLocaleDateString();
+        forecastDiv.innerHTML += `
+          <div class="day">
+            <h4>${date}</h4>
+            <p>${item.main.temp}°C</p>
+            <p>${item.weather[0].main}</p>
+          </div>
+        `;
+      });
+    }
+  </script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+
+
+</body><grammarly-desktop-integration data-grammarly-shadow-root="true"><template shadowrootmode="open"><style>
+      div.grammarly-desktop-integration {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select:none;
+        user-select:none;
+      }
+
+      div.grammarly-desktop-integration:before {
+        content: attr(data-content);
+      }
+    </style><div aria-label="grammarly-integration" role="group" tabindex="-1" class="grammarly-desktop-integration" data-content="{&quot;mode&quot;:&quot;full&quot;,&quot;isActive&quot;:true,&quot;isUserDisabled&quot;:false}"></div></template></grammarly-desktop-integration></html>
